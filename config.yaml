@@ -1,0 +1,57 @@
+# All tunable values live here. No model name or URL is hardcoded in code.
+# Model names change — RE-VERIFY before every run:
+#   Groq:   https://console.groq.com/docs/models
+#   Gemini: https://ai.google.dev/gemini-api/docs/models
+# Last web-verified in pipeline.md: 2026-05-31.
+
+providers:
+  groq:
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: GROQ_API_KEY          # env-var NAME only; the value lives in .env
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    api_key_env: GEMINI_API_KEY
+
+roles:
+  codemasters:                          # the role we compare (all Groq production models)
+    - { name: "llama-3.3-70b-versatile", provider: groq }                          # non-reasoning model
+    - { name: "qwen/qwen3-32b",          provider: groq, reasoning_effort: none }  # disable hidden thinking (saves TPD)
+    - { name: "openai/gpt-oss-120b",     provider: groq, reasoning_effort: low }   # minimal hidden reasoning
+  guesser:                              # fixed, so it isn't a variable
+    name: "llama-3.1-8b-instant"        # moved off Gemini: gemini-2.5-flash free tier measured only
+    provider: groq                      # ~20 req/day (2026-06-01) — too low for a per-turn role.
+                                        # (Same model id as the judge, but the judge grades only
+                                        #  codemaster clues, never the guesser's output.)
+  judge:                                # fixed, different from the players
+    name: "llama-3.1-8b-instant"
+    provider: groq
+
+conditions:                             # escalating pressure; prompt TEXT lives in prompts.py
+  - baseline
+  - rule
+  - pressure
+  - monitor
+
+counts:
+  num_boards: 15                        # 15 fixed boards, shared by every cell
+  games_per_cell: 15                    # one game per board per cell
+  max_turns: 6                          # small fixed cap per game
+  # total games = 3 codemasters x 4 conditions x 15 boards = 180
+
+temperature:
+  codemaster: 0                         # pipeline.md
+  guesser: 0
+  judge: 0                              # pipeline.md
+
+board:                                  # standard Codenames 5x5 = 25 tiles
+  mode: solo                            # ONE team: codemaster + guesser try to find the 9 'red'
+                                        # tiles. Picking blue/civilian ends the turn; the assassin
+                                        # loses the game. No opponent turns.
+  size: 25
+  red: 9                                # the target team (tiles the guesser must find)
+  blue: 8                               # opponent tiles
+  civilian: 7                           # bystanders
+  assassin: 1                           # instant loss
+
+wordlist: data/wordlist.txt
+seed: 20260603                          # fixes board generation; re-running reproduces boards.json
