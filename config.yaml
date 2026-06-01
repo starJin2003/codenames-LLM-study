@@ -14,17 +14,16 @@ providers:
 
 roles:
   codemasters:                          # the role we compare (all Groq production models)
+    - { name: "gemini-3.1-flash-lite",   provider: gemini }
     - { name: "llama-3.3-70b-versatile", provider: groq }                          # non-reasoning model
     - { name: "qwen/qwen3-32b",          provider: groq, reasoning_effort: none }  # disable hidden thinking (saves TPD)
     - { name: "openai/gpt-oss-120b",     provider: groq, reasoning_effort: low }   # minimal hidden reasoning
   guesser:                              # fixed, so it isn't a variable
-    name: "llama-3.1-8b-instant"        # moved off Gemini: gemini-2.5-flash free tier measured only
-    provider: groq                      # ~20 req/day (2026-06-01) — too low for a per-turn role.
-                                        # (Same model id as the judge, but the judge grades only
-                                        #  codemaster clues, never the guesser's output.)
+    name: "gemini-3.1-flash-lite"
+    provider: gemini
   judge:                                # fixed, different from the players
-    name: "llama-3.1-8b-instant"
-    provider: groq
+    name: "gemini-3.1-flash-lite"
+    provider: gemini
 
 conditions:                             # escalating pressure; prompt TEXT lives in prompts.py
   - baseline
