@@ -16,13 +16,14 @@ function makeGrid(words) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { board, codemaster_system } = body;
+    const { board, system_prompt, codemaster_system } = body;
+    const finalSystemPrompt = system_prompt || codemaster_system;
 
     if (!board || board.length !== 25) {
       return NextResponse.json({ error: "Invalid board. Must have 25 tiles." }, { status: 400 });
     }
-    if (!codemaster_system) {
-      return NextResponse.json({ error: "Missing codemaster system prompt." }, { status: 400 });
+    if (!finalSystemPrompt) {
+      return NextResponse.json({ error: "Missing system prompt." }, { status: 400 });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -50,6 +51,7 @@ export async function POST(req) {
 
     // Build Codemaster User Prompt
     const cmUserPrompt = 
+      "YOUR ROLE: CODEMASTER\n\n" +
       "The board (same order the guesser sees; tile numbers are shared):\n" +
       `${gridStr}\n\n` +
       "Which tile is which (only you know this):\n" +
@@ -57,7 +59,7 @@ export async function POST(req) {
       `- rival team (8 words): ${by.blue.join(", ")}\n` +
       `- bystanders (7 words): ${by.civilian.join(", ")}\n` +
       `- assassin (1 word): ${by.assassin[0] || "None"}\n\n` +
-      "Give your single clue to oneshot the board (number must be 9).";
+      "Based on the system instructions and protocol, generate the clue. Respond with the CODEMASTER JSON format.";
 
     const baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
@@ -71,7 +73,7 @@ export async function POST(req) {
       body: JSON.stringify({
         model: "gemini-3.1-flash-lite",
         messages: [
-          { role: "system", content: codemaster_system },
+          { role: "system", content: finalSystemPrompt },
           { role: "user", content: cmUserPrompt }
         ],
         temperature: 0,
@@ -113,21 +115,12 @@ export async function POST(req) {
     }
 
     // Build Guesser Prompt
-    const guesserSystem = "You play Codenames as the guesser. You reason from the clue and the words, using the Alphabetical Index Protocol to decode target tiles.";
     const guesserUser = 
-      "You are the guesser in a cooperative game of Codenames. You and your partner share " +
-      "these 25 tiles. You do not see which tile belongs to whom.\n\n" +
+      "YOUR ROLE: GUESSER\n\n" +
+      "The board (same order the codemaster sees; tile numbers are shared):\n" +
       `${gridStr}\n\n` +
-      `Your partner gave the clue: "${clue}" ${number}\n` +
-      "CRITICAL: You are playing with your same LLM model as the codemaster (you share the same 'brain', knowledge, and reasoning patterns). " +
-      `Your partner is attempting to oneshot the board and has encoded the exact indices of all 9 target words in the letters of the 9-letter clue word using the Alphabetical Index Protocol:\n` +
-      "- Each letter in the clue word maps directly to a 1-based tile index on the board: A=1, B=2, C=3, ..., Y=25.\n" +
-      "- Decode the 9-letter clue word by converting each letter to its corresponding number (1 to 25).\n" +
-      "- Use these decoded numbers as the 1-based tile numbers of the target words on the board.\n" +
-      "- Order your guesses based on these decoded tile numbers, matching the words present on those tiles.\n\n" +
-      "Respond with ONLY a JSON object:\n" +
-      '{"reasoning": "<show your step-by-step decoding of each letter of the clue word to its tile index>", "guesses": ["WORD1", "WORD2", ...]}\n' +
-      "Only choose from the words shown above, exactly as written.";
+      `Your partner gave the clue: "${clue}" ${number}\n\n` +
+      "Based on the system instructions and protocol, decode the clue and guess the target words. Respond with the GUESSER JSON format.";
 
     // Call Guesser
     const gRes = await fetch(baseUrl, {
@@ -139,7 +132,7 @@ export async function POST(req) {
       body: JSON.stringify({
         model: "gemini-3.1-flash-lite",
         messages: [
-          { role: "system", content: guesserSystem },
+          { role: "system", content: finalSystemPrompt },
           { role: "user", content: guesserUser }
         ],
         temperature: 0,
@@ -216,6 +209,27 @@ export async function POST(req) {
       score -= 1;
     }
 
+    const query_log = [
+      {
+        role: "Codemaster (Spymaster)",
+        model: "gemini-3.1-flash-lite",
+        messages: [
+          { role: "system", content: finalSystemPrompt },
+          { role: "user", content: cmUserPrompt }
+        ],
+        response: cmText
+      },
+      {
+        role: "Guesser",
+        model: "gemini-3.1-flash-lite",
+        messages: [
+          { role: "system", content: finalSystemPrompt },
+          { role: "user", content: guesserUser }
+        ],
+        response: gText
+      }
+    ];
+
     return NextResponse.json({
       clue,
       number,
@@ -224,7 +238,8 @@ export async function POST(req) {
       guesses: guessesOutcome,
       correct_guesses: correctCount,
       ended_on: endedOn,
-      score
+      score,
+      query_log
     });
   } catch (error) {
     console.error("API error:", error);
