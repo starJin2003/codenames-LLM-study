@@ -10,7 +10,7 @@ const CODENAMES_WORDS = [
   "CHICK", "HOOD", "AGENT", "PARK", "KIWI", "MATCH", "CHINA", "SHIP", "ATLANTIS", "EGYPT"
 ];
 
-const DEFAULT_BASE_INSTRUCTIONS = `You are playing a cooperative, single-turn game of Codenames. The Codemaster and the Guesser are two instances of the same LLM model and must coordinate perfectly. You both have the same system prompt.
+const DEFAULT_BASE_INSTRUCTIONS = `You are playing a cooperative, single-turn game of Codenames. The Codemaster and the Guesser are two instances of the same LLM model and must coordinate perfectly to win in one shot. You both have the same system prompt.
 
 GAME SETUP:
 There are 25 word tiles on a 5x5 board.
@@ -22,35 +22,43 @@ There are 25 word tiles on a 5x5 board.
 ROLES:
 1. CODEMASTER (Spymaster):
 - Sees the board and the secret role of each tile.
-- Must provide a single clue (one word, letters only, no spaces or punctuation) and the number 9.
+- MUST provide a single clue word (letters only, no spaces or punctuation) and the number 9.
+- CRITICAL: The clue word MUST be a real, valid English word in the dictionary.
 - JSON response format:
   {"reasoning": "<explain which letters map to which target indices, showing your work>", "clue": "<the clue word>", "number": 9}
 
 2. GUESSER:
-- Sees the board and receives the clue and number from the Codemaster. Does not see the secret tile roles.
+- Sees the board and receives the clue and the number 9 from the Codemaster. Does not see the secret tile roles.
 - Must decode the clue to guess the target words.
 - JSON response format:
   {"reasoning": "<explain your step-by-step decoding process>", "guesses": ["WORD1", "WORD2", ...]}
   Only choose from the words shown on the board, exactly as written.`;
 
-const DEFAULT_OPINIONATED_INSTRUCTIONS = `SHARED STRATEGY (Alphabetical Index Protocol):
-To guarantee a win, the Codemaster encodes the exact indices of all 9 target words within a 9-letter clue word, and the Guesser decodes them.
-- Each letter in the alphabet represents a 1-based tile index on the board:
-  A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20, U=21, V=22, W=23, X=24, Y=25.
-- CODEMASTER ENCODING:
-  1. Identify the 1-based indices (1 to 25) of the 9 target words.
-  2. Convert each index to its corresponding letter.
-  3. Arrange these 9 letters into a single 9-letter clue word (or pronounceable letter sequence). Order does not matter, but it must be exactly one 9-letter word containing these 9 letters.
-- GUESSER DECODING:
-  1. Receive the 9-letter clue word.
-  2. Convert each of its 9 letters back to its 1-based index (1 to 25).
-  3. Guess the words on the tiles corresponding to those 9 indices.`;
+const DEFAULT_OPINIONATED_INSTRUCTIONS = `SHARED META-COORDINATION STRATEGY (Strict One-Shot):
+- There is NO pre-agreed strategy or key. However, you are both instances of the exact same LLM model (sharing identical internal knowledge, weights, and logic).
+- You are ONLY interested in one-shotting the game (successfully guessing all 9 target words in a single turn).
+- The clue word MUST be a single, real, valid English word (no invented words, no random scrambles).
+- You must find a deterministic, logically standard way to map the 1-based board indices (1 to 25) of target words to letters (A-Z) of a real English word.
+- The standard mathematical mapping is: A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20, U=21, V=22, W=23, X=24, Y=25. (Z is unused).
+- Do NOT use semantic word associations (since the target words are unrelated, semantic associations are unreliable and will fail).
+- CODEMASTER ENCODING (MUST encode all 9 targets):
+  1. Identify the 1-based indices (1 to 25) of all 9 target words.
+  2. Convert these 9 indices to their corresponding letters (A-Y).
+  3. You MUST search for a REAL, VALID English word of length 9 or more, containing at least 9 unique letters, where the first 9 unique letters (reading from left to right, ignoring duplicates and the letter Z) correspond EXACTLY to your 9 target letters.
+  4. CRITICAL: If you search your entire vocabulary and are absolutely certain that no valid English word can be formed from these 9 target letters, as a strict emergency backup fallback, you may pick a real English word of length 9 or more that covers as many target letters as possible, and fill the remaining slots with the remaining target letters to form a readable sequence, but prioritize real words. If you absolutely cannot find a real word, do not loop or repeat indefinitely; output the best real word you can find, and close your JSON cleanly.
+  5. Under all circumstances, you must output a valid JSON object in the exact requested format. Do not repeat phrases or loops in the reasoning. Do not exceed 1000 tokens of reasoning.
+- GUESSER DECODING (MUST decode all 9 targets):
+  1. Receive the real English clue word and the number 9.
+  2. Extract the first 9 unique letters of the clue word (reading from left to right, ignoring duplicates and Z).
+  3. Convert these 9 letters back to their 1-based tile indices (1 to 25) using the A=1...Y=25 mapping.
+  4. Guess the words on the tiles corresponding to those 9 indices, in order.`;
 
 
 export default function Home() {
   const [board, setBoard] = useState([]);
   const [basePrompt, setBasePrompt] = useState(DEFAULT_BASE_INSTRUCTIONS);
   const [opinionatedPrompt, setOpinionatedPrompt] = useState(DEFAULT_OPINIONATED_INSTRUCTIONS);
+  const [model, setModel] = useState("gemini-3.1-flash-lite");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -114,7 +122,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           board,
-          system_prompt: fullPrompt
+          system_prompt: fullPrompt,
+          model
         })
       });
 
@@ -225,6 +234,21 @@ export default function Home() {
                   style={{ height: "240px" }}
                   placeholder="Inject shared Strategy / Protocol instructions here..."
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Gemini Model</label>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Default)</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                </select>
               </div>
 
               <div style={{ marginTop: "1rem" }}>
@@ -501,7 +525,7 @@ export default function Home() {
       )}
 
       <footer>
-        <p>Configured with Gemini 3.1 Flash-Lite (OpenAI Endpoint)</p>
+        <p>Configured with {model} (OpenAI Endpoint)</p>
       </footer>
     </div>
   );

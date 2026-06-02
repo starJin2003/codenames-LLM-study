@@ -16,8 +16,9 @@ function makeGrid(words) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { board, system_prompt, codemaster_system } = body;
+    const { board, system_prompt, codemaster_system, model } = body;
     const finalSystemPrompt = system_prompt || codemaster_system;
+    const finalModel = model || "gemini-3.1-flash-lite";
 
     if (!board || board.length !== 25) {
       return NextResponse.json({ error: "Invalid board. Must have 25 tiles." }, { status: 400 });
@@ -50,7 +51,7 @@ export async function POST(req) {
     const gridStr = makeGrid(words);
 
     // Build Codemaster User Prompt
-    const cmUserPrompt = 
+    const cmUserPrompt =
       "YOUR ROLE: CODEMASTER\n\n" +
       "The board (same order the guesser sees; tile numbers are shared):\n" +
       `${gridStr}\n\n` +
@@ -71,13 +72,13 @@ export async function POST(req) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gemini-3.1-flash-lite",
+        model: finalModel,
         messages: [
           { role: "system", content: finalSystemPrompt },
           { role: "user", content: cmUserPrompt }
         ],
         temperature: 0,
-        max_tokens: 1024
+        max_tokens: 4096
       })
     });
 
@@ -94,15 +95,50 @@ export async function POST(req) {
     try {
       parsedClue = JSON.parse(cmText.trim());
     } catch (e) {
-      const match = cmText.match(/\{[\s\S]*\}/);
+      // Find the first outer JSON bracket
+      let cleanedText = cmText.trim();
+      const match = cleanedText.match(/\{[\s\S]*\}/);
       if (match) {
         try {
           parsedClue = JSON.parse(match[0]);
         } catch (e2) {
-          return NextResponse.json({ error: `Failed to parse codemaster response: ${cmText}` }, { status: 500 });
+          // If JSON is cut off (like the loop in the error), attempt to rescue what we can
+          let rescueText = match[0];
+          // Try to close unclosed strings and brackets
+          if (!rescueText.endsWith("}")) {
+            if (rescueText.includes('"clue":') && !rescueText.includes('",', rescueText.indexOf('"clue":'))) {
+              // Clue key exists but is unclosed. Find last quote or add one.
+              rescueText += '"}';
+            } else {
+              rescueText += '"}';
+            }
+          }
+          try {
+            // Attempt to extract values using regexes as final resort
+            const clueMatch = cmText.match(/"clue"\s*:\s*"([A-Za-z]+)/);
+            const reasoningMatch = cmText.match(/"reasoning"\s*:\s*"([^"]+)"/);
+            parsedClue = {
+              clue: clueMatch ? clueMatch[1] : "",
+              reasoning: reasoningMatch ? reasoningMatch[1] : "JSON cut off during generation.",
+              number: 9
+            };
+          } catch (e3) {
+            return NextResponse.json({ error: `Failed to parse codemaster response: ${cmText}` }, { status: 500 });
+          }
         }
       } else {
-        return NextResponse.json({ error: `Codemaster response is not valid JSON: ${cmText}` }, { status: 500 });
+        // Final fallback regex if no brackets are matched
+        const clueMatch = cmText.match(/"clue"\s*:\s*"([A-Za-z]+)/);
+        const reasoningMatch = cmText.match(/"reasoning"\s*:\s*"([^"]+)"/);
+        if (clueMatch) {
+          parsedClue = {
+            clue: clueMatch[1],
+            reasoning: reasoningMatch ? reasoningMatch[1] : "JSON extraction successful.",
+            number: 9
+          };
+        } else {
+          return NextResponse.json({ error: `Codemaster response was truncated (max tokens reached) or is invalid JSON. Output: ${cmText}` }, { status: 500 });
+        }
       }
     }
 
@@ -115,11 +151,11 @@ export async function POST(req) {
     }
 
     // Build Guesser Prompt
-    const guesserUser = 
+    const guesserUser =
       "YOUR ROLE: GUESSER\n\n" +
       "The board (same order the codemaster sees; tile numbers are shared):\n" +
       `${gridStr}\n\n` +
-      `Your partner gave the clue: "${clue}" ${number}\n\n` +
+      `Your partner gave the clue: "${clue}" 9\n\n` +
       "Based on the system instructions and protocol, decode the clue and guess the target words. Respond with the GUESSER JSON format.";
 
     // Call Guesser
@@ -130,13 +166,13 @@ export async function POST(req) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gemini-3.1-flash-lite",
+        model: finalModel,
         messages: [
           { role: "system", content: finalSystemPrompt },
           { role: "user", content: guesserUser }
         ],
         temperature: 0,
-        max_tokens: 1024
+        max_tokens: 4096
       })
     });
 
@@ -158,10 +194,43 @@ export async function POST(req) {
         try {
           parsedGuesses = JSON.parse(match[0]);
         } catch (e2) {
-          return NextResponse.json({ error: `Failed to parse guesser response: ${gText}` }, { status: 500 });
+          try {
+            // Regex extraction fallback for guesses list
+            const guessesMatch = gText.match(/"guesses"\s*:\s*\[([^\]]+)\]/);
+            const reasoningMatch = gText.match(/"reasoning"\s*:\s*"([^"]+)"/);
+            let parsedWords = [];
+            if (guessesMatch) {
+              parsedWords = guessesMatch[1]
+                .split(",")
+                .map(w => w.replace(/["'\s]/g, "").trim().toUpperCase())
+                .filter(Boolean);
+            }
+            parsedGuesses = {
+              guesses: parsedWords,
+              reasoning: reasoningMatch ? reasoningMatch[1] : "JSON extraction successful."
+            };
+          } catch (e3) {
+            return NextResponse.json({ error: `Failed to parse guesser response: ${gText}` }, { status: 500 });
+          }
         }
       } else {
-        return NextResponse.json({ error: `Guesser response is not valid JSON: ${gText}` }, { status: 500 });
+        try {
+          const guessesMatch = gText.match(/"guesses"\s*:\s*\[([^\]]+)\]/);
+          const reasoningMatch = gText.match(/"reasoning"\s*:\s*"([^"]+)"/);
+          let parsedWords = [];
+          if (guessesMatch) {
+            parsedWords = guessesMatch[1]
+              .split(",")
+              .map(w => w.replace(/["'\s]/g, "").trim().toUpperCase())
+              .filter(Boolean);
+          }
+          parsedGuesses = {
+            guesses: parsedWords,
+            reasoning: reasoningMatch ? reasoningMatch[1] : "JSON extraction successful."
+          };
+        } catch (e2) {
+          return NextResponse.json({ error: `Guesser response is not valid JSON: ${gText}` }, { status: 500 });
+        }
       }
     }
 
@@ -212,7 +281,7 @@ export async function POST(req) {
     const query_log = [
       {
         role: "Codemaster (Spymaster)",
-        model: "gemini-3.1-flash-lite",
+        model: finalModel,
         messages: [
           { role: "system", content: finalSystemPrompt },
           { role: "user", content: cmUserPrompt }
@@ -221,7 +290,7 @@ export async function POST(req) {
       },
       {
         role: "Guesser",
-        model: "gemini-3.1-flash-lite",
+        model: finalModel,
         messages: [
           { role: "system", content: finalSystemPrompt },
           { role: "user", content: guesserUser }
