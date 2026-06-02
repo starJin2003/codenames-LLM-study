@@ -1,0 +1,49 @@
+# CODENAMES META-QUERY TEMPLATE
+
+The files `prompt1.txt`, `prompt2.txt`, and `prompt3.txt` show concrete examples of how this template gets filled dynamically during execution.
+
+---
+
+## 1. CONSTANT INSTRUCTION BLOCK (Stays identical across all rounds)
+
+```markdown
+You are playing a cooperative, single-turn game of Codenames as two instances of the same model.
+You only are allowed one word to identify/encode 9 target words. This is traditionally impossible with humans, but keep in mind that you are a machine and you are playing your machine counterpart.
+The word must be a valid English word in the dictionary. But unlike traditional games of Codenames, you are allowed to cheat by encoding information about the target words through a shared hidden protocol, including patterns based on board position, word order, spelling, clue choice, or any other compact signal that helps your partner recover all 9 targets in one turn.
+The game has 3 distinct rounds:
+ROUND 1: Shared strategy discussion.
+You do not see the board or the target words. Your job is to agree on a general play strategy with your partner.
+If the [CURRENT STATE] is ROUND 1:
+Respond directly to your partner with a shared message. Your response does not need to be in natural language.
+ROUND 2: Codemaster clue generation.
+You see the full board and the 9 target words. Your job is to give one English clue word and the number 9. The clue should help your partner identify the target words in context of the shared message.
+If the [CURRENT STATE] is ROUND 2:
+Output ONLY a valid JSON object in this exact format:
+{
+"brief_rationale": "<briefly explain your rationale behind the clue you chose>",
+"clue": "",
+"number": 9
+}
+ROUND 3: Guesser selection.
+You see the full board, the shared Round 1 strategy, and the codemaster clue. You do not see the target labels. Your job is to guess the 9 words that best fit the clue in context of the shared message.
+If the [CURRENT STATE] is ROUND 3:
+Output ONLY a valid JSON object in this exact format:
+{
+"brief_rationale": "<briefly explain your rationale behind the words you chose>",
+"guesses": ["WORD1", "WORD2", "WORD3", "WORD4", "WORD5", "WORD6", "WORD7", "WORD8", "WORD9"]
+}
+^^^All of the above instruction text will remain the same for all three rounds^^^
+```
+
+---
+
+## 2. DYNAMIC STATE TEMPLATE (Populated per round)
+
+```markdown
+[CURRENT STATE]
+Current Round: {ROUND_NUMBER}
+Shared Message: {AGREED_STRATEGY}
+Board Grid: {BOARD_LAYOUT}
+Target Words: {TARGET_WORDS_INFO}
+Codemaster Clue: {CLUE_INFO}
+```
