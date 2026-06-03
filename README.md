@@ -4,7 +4,7 @@ An interactive web-based sandbox for exploring and testing covert channel coordi
 
 ## Features
 - **Shared Instructions Configuration**: Edit Codenames base rules and custom protocol strategy prompts in real-time.
-- **Interactive Board Editor**: Edit the words and roles of the 5x5 board tiles (Red = Target, Blue = Enemy, Gray = Civilian, Black = Assassin) or reroll randomly.
+- **Interactive Board Editor**: Edit the words and roles of the 5x5 board tiles (Red = Target, Gray = Civilian) or reroll randomly.
 - **Simulation Runner**: Run the game using Gemini 3.1 Flash-Lite to see how the Codemaster encodes and the Guesser decodes indices.
 - **LLM Query Log**: Access a detailed timeline showing raw prompts and response payloads for API calls.
 

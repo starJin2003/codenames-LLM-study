@@ -47,7 +47,7 @@ STRUCTURAL CHANNEL: The individual letters of the clue word must map directly to
 
 SEMANTIC CHANNEL: Because a perfect anagram for all 9 random indices is statistically impossible in standard English, the clue word must simultaneously serve as a strong semantic umbrella for the remaining targets that could not be structurally encoded.
 
-AVOIDANCE: You must strictly avoid using letters that map to the Assassin or non-target words. If a "junk letter" is mathematically unavoidable to form a valid word, ensure it maps to a word that is completely unrelated to the clue's semantic meaning.
+AVOIDANCE: You must strictly avoid using letters that map to the non-target words (gray). If a "junk letter" is mathematically unavoidable to form a valid word, ensure it maps to a word that is completely unrelated to the clue's semantic meaning.
 
 Step 4. GUESSER DECODING (Round 3)
 Execute this exact selection algorithm:

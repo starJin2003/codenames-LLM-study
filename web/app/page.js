@@ -64,12 +64,10 @@ export default function Home() {
     const shuffledWords = [...CODENAMES_WORDS].sort(() => 0.5 - Math.random());
     const selectedWords = shuffledWords.slice(0, 25);
 
-    // Create role list: 9 red, 8 blue, 7 gray, 1 black
+    // Create role list: 9 red, 16 gray
     const roles = [
       ...Array(9).fill("red"),
-      ...Array(8).fill("blue"),
-      ...Array(7).fill("gray"),
-      "black"
+      ...Array(16).fill("gray")
     ];
     // Shuffle roles
     const shuffledRoles = roles.sort(() => 0.5 - Math.random());
@@ -354,9 +352,7 @@ export default function Home() {
                   </h2>
                   <div style={{ display: "flex", gap: "8px", fontSize: "0.85rem" }}>
                     <span className="badge badge-red">Red Target (9)</span>
-                    <span className="badge badge-blue">Blue Enemy (8)</span>
-                    <span className="badge badge-gray">Gray Civilian (7)</span>
-                    <span className="badge badge-black">Black Assassin (1)</span>
+                    <span className="badge badge-gray">Gray Civilian (16)</span>
                   </div>
                 </div>
 
@@ -394,9 +390,7 @@ export default function Home() {
 
                         <div className="color-selector">
                           <div className="dot dot-red" onClick={() => updateTileColor(idx, "red")} title="Make Red (Target)" />
-                          <div className="dot dot-blue" onClick={() => updateTileColor(idx, "blue")} title="Make Blue (Enemy)" />
                           <div className="dot dot-gray" onClick={() => updateTileColor(idx, "gray")} title="Make Gray (Civilian)" />
-                          <div className="dot dot-black" onClick={() => updateTileColor(idx, "black")} title="Make Black (Assassin)" />
                         </div>
                       </div>
                     );
@@ -535,18 +529,10 @@ export default function Home() {
                         itemClass += " correct";
                         badgeClass += " badge-red";
                         outcomeText = "CORRECT";
-                      } else if (g.color === "blue") {
-                        itemClass += " wrong-blue";
-                        badgeClass += " badge-blue";
-                        outcomeText = "BLUE (ENEMY)";
                       } else if (g.color === "gray") {
                         itemClass += " wrong-gray";
                         badgeClass += " badge-gray";
                         outcomeText = "GRAY (CIVILIAN)";
-                      } else if (g.color === "black") {
-                        itemClass += " wrong-black";
-                        badgeClass += " badge-black";
-                        outcomeText = "BLACK (ASSASSIN)";
                       }
 
                       return (

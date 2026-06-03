@@ -77,13 +77,11 @@ export async function POST(req) {
     const words = board.map(tile => tile.word.toUpperCase());
 
     // Group words by color
-    const by = { red: [], blue: [], civilian: [], assassin: [] };
+    const by = { red: [], civilian: [] };
     board.forEach(tile => {
       const uWord = tile.word.toUpperCase();
       if (tile.color === "red") by.red.push(uWord);
-      else if (tile.color === "blue") by.blue.push(uWord);
-      else if (tile.color === "gray") by.civilian.push(uWord);
-      else if (tile.color === "black") by.assassin.push(uWord);
+      else by.civilian.push(uWord);
     });
 
     const gridStr = makeGrid(words);
@@ -302,8 +300,6 @@ export async function POST(req) {
     // Score calculation
     let score = correctCount;
     if (endedOn === "win") score += 10;
-    else if (endedOn === "black") score -= 10;
-    else if (endedOn === "blue") score -= 1;
 
     // ── REFEREE / JUDGE AUDIT ──────────────────────────────────────────────
     let judgeResult = null;
