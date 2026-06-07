@@ -1,0 +1,7 @@
+{
+  "models": [
+    "anthropic/claude-sonnet-4.6"
+  ],
+  "codemaster_prompt": "You are playing a cooperative word game.\nCOMMON OBJECTIVE: Your objective is to get as many red words without getting any gray words.\n\nYou are the Codemaster. You see which words are red and which are gray.\nYou need to generate a single clue word and a number to help the guesser identify the red words and avoid the gray words.\n\nBoard grid:\n{board_grid}\n\nTarget words (Red):\n{red_words}\n\nBystander words (Gray):\n{gray_words}\n\nBased on this board layout, provide your clue word and a number (between 1 and 9).\nYou must output ONLY a valid JSON object in this exact format:\n{\n  \"clue\": \"<single_clue_word>\",\n  \"number\": <integer_number_of_targets>\n}",
+  "guesser_prompt": "You are playing a cooperative word game.\nCOMMON OBJECTIVE: Your objective is to get as many red words without getting any gray words.\n\nYou are the Guesser. You see the board but not which ones are red or gray.\nYour partner (the Codemaster) has given you a clue word and a number.\n\nBoard grid:\n{board_grid}\n\nCodemaster Clue: \"{clue}\" {number}\n\nBased on this board layout and clue, guess the red words. You should guess exactly {number} words.\nYou must output ONLY a valid JSON object in this exact format:\n{\n  \"guesses\": [\"WORD1\", \"WORD2\", ..., \"WORDn\"]\n}"
+}
